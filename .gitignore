@@ -1,0 +1,8 @@
+.skillweave/
+.env
+.env.local
+*.log
+reports/
+vendor-assets/
+secrets/
+uploads/

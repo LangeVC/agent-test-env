@@ -1,0 +1,5 @@
+name: test-skill
+version: 1.0.0
+kind: skill
+description: Test skill for agent-test-env — validates install/verify lifecycle across all agent frameworks
+author: agent-test-env

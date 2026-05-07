@@ -1,0 +1,72 @@
+version: "3.8"
+
+services:
+  opencode:
+    build:
+      context: ./frameworks/opencode
+      dockerfile: Dockerfile
+    container_name: agent-test-env-opencode
+    hostname: opencode
+    volumes:
+      - ./fixtures:/fixtures:ro
+    networks:
+      - agent-test-network
+    tty: true
+    stdin_open: true
+
+  claude-code:
+    build:
+      context: ./frameworks/claude-code
+      dockerfile: Dockerfile
+    container_name: agent-test-env-claude-code
+    hostname: claude-code
+    volumes:
+      - ./fixtures:/fixtures:ro
+    networks:
+      - agent-test-network
+    tty: true
+    stdin_open: true
+
+  codex-cli:
+    build:
+      context: ./frameworks/codex-cli
+      dockerfile: Dockerfile
+    container_name: agent-test-env-codex-cli
+    hostname: codex-cli
+    volumes:
+      - ./fixtures:/fixtures:ro
+    networks:
+      - agent-test-network
+    tty: true
+    stdin_open: true
+
+  gemini-cli:
+    build:
+      context: ./frameworks/gemini-cli
+      dockerfile: Dockerfile
+    container_name: agent-test-env-gemini-cli
+    hostname: gemini-cli
+    volumes:
+      - ./fixtures:/fixtures:ro
+    networks:
+      - agent-test-network
+    tty: true
+    stdin_open: true
+
+  continue:
+    build:
+      context: ./frameworks/continue
+      dockerfile: Dockerfile
+    container_name: agent-test-env-continue
+    hostname: continue
+    volumes:
+      - ./fixtures:/fixtures:ro
+    networks:
+      - agent-test-network
+    tty: true
+    stdin_open: true
+
+networks:
+  agent-test-network:
+    name: agent-test-network
+    driver: bridge

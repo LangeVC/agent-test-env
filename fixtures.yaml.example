@@ -1,0 +1,15 @@
+# Fixture Configuration
+# Declare test fixtures for agent-test-env.
+# Overlay this file in downstream projects to add custom fixtures.
+
+# List of fixture directories (relative to repo root)
+fixtures:
+  - test-skill
+  - test-mcp-server
+
+# Per-fixture overrides (optional)
+# fixture_overrides:
+#   my-capability:
+#     framework_skip:
+#       - cursor
+#     verify_command: "echo 'custom verify'"

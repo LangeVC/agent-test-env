@@ -1,0 +1,65 @@
+name: "agent-test-env CI"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frameworks/**"
+      - "fixtures/**"
+      - "scripts/**"
+      - "tests/**"
+      - "docker-compose.yml"
+      - ".github/workflows/test.yml"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: "${{ matrix.framework }} × ${{ matrix.fixture }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        framework:
+          - opencode
+          - claude-code
+          - codex-cli
+          - gemini-cli
+          - continue
+          - cursor
+        fixture:
+          - test-skill
+          - test-mcp-server
+        exclude:
+          - framework: cursor
+            fixture: test-skill
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build framework image
+        if: matrix.framework != 'cursor'
+        run: docker compose build "${{ matrix.framework }}"
+
+      - name: Start framework container
+        run: docker compose up -d "${{ matrix.framework }}" || true
+
+      - name: Wait for container
+        run: sleep 10
+
+      - name: Run test (${{ matrix.framework }} × ${{ matrix.fixture }})
+        run: bash scripts/test-framework.sh "${{ matrix.framework }}" "${{ matrix.fixture }}"
+
+      - name: Collect results
+        if: always()
+        run: |
+          echo "### Framework: ${{ matrix.framework }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Fixture: ${{ matrix.fixture }}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v
