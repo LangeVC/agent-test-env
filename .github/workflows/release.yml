@@ -19,6 +19,8 @@ jobs:
     name: "Validate release tag"
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Check semver tag format
         run: |
           TAG="${{ github.ref_name }}"

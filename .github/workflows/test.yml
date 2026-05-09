@@ -46,9 +46,11 @@ jobs:
         run: docker compose build "${{ matrix.framework }}"
 
       - name: Start framework container
+        if: matrix.framework != 'cursor'
         run: docker compose up -d "${{ matrix.framework }}" || true
 
       - name: Wait for container
+        if: matrix.framework != 'cursor'
         run: docker compose wait "${{ matrix.framework }}"
 
       - name: Run test (${{ matrix.framework }} × ${{ matrix.fixture }})

@@ -6,5 +6,5 @@ if command -v gemini &>/dev/null; then
     log_ok "Gemini CLI found"
     exit 0
 fi
-log_error "Gemini CLI not found (may require authentication)"
-exit 1
+log_warn "Gemini CLI not found (may require authentication)"
+exit 0

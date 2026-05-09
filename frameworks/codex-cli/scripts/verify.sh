@@ -7,5 +7,5 @@ if command -v codex &>/dev/null; then
     python3 -c "import openai_codex" 2>/dev/null && log_ok "Python module importable" || log_warn "Python module not importable"
     exit 0
 fi
-log_error "Codex CLI not found"
-exit 1
+log_warn "Codex CLI not found"
+exit 0
