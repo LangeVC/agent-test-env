@@ -1,0 +1,10 @@
+name: test-bundle
+version: 1.0.0
+kind: bundle
+description: Test bundle for agent-test-env
+author: agent-test-env
+capabilities:
+  - name: sub-skill
+    source: ./sub-skill
+  - name: sub-tool
+    source: ./sub-tool

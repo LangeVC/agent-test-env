@@ -1,0 +1,5 @@
+name: test-tool
+version: 1.0.0
+kind: tool
+description: Test tool for agent-test-env — validates tool install/verify lifecycle
+author: agent-test-env

@@ -6,4 +6,6 @@ COPY scripts/ /scripts/
 RUN chmod +x /scripts/*.sh
 
 WORKDIR /test
-HEALTHCHECK --interval=10s --retries=5 CMD /scripts/verify.sh
+RUN /scripts/install.sh
+HEALTHCHECK --interval=10s --retries=5 --start-period=30s CMD /scripts/verify.sh || exit 1
+CMD ["tail", "-f", "/dev/null"]

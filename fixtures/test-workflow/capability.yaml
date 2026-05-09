@@ -1,0 +1,5 @@
+name: test-workflow
+version: 1.0.0
+kind: workflow
+description: Test workflow for agent-test-env — validates workflow install/verify lifecycle
+author: agent-test-env

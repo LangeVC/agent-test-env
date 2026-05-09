@@ -49,7 +49,7 @@ jobs:
         run: docker compose up -d "${{ matrix.framework }}" || true
 
       - name: Wait for container
-        run: sleep 10
+        run: docker compose wait "${{ matrix.framework }}"
 
       - name: Run test (${{ matrix.framework }} × ${{ matrix.fixture }})
         run: bash scripts/test-framework.sh "${{ matrix.framework }}" "${{ matrix.fixture }}"

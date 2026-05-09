@@ -1,0 +1,5 @@
+name: test-template
+version: 1.0.0
+kind: template
+description: Test template for agent-test-env — validates template install/verify lifecycle
+author: agent-test-env

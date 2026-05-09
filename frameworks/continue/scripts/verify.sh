@@ -6,5 +6,5 @@ if command -v continue &>/dev/null; then
     log_ok "Continue.dev found"
     exit 0
 fi
-log_warn "Continue.dev not found (may require VS Code environment)"
-exit 0
+log_error "Continue.dev not found (may require VS Code environment)"
+exit 1

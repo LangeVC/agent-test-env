@@ -1,0 +1,8 @@
+name: test-runtimes-skill
+version: 1.0.0
+kind: skill
+description: Test skill with runtime requirements for agent-test-env — validates pre-flight checks
+author: agent-test-env
+runtimes:
+  uv: ">=0.4.0"
+  node: ">=20"

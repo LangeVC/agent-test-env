@@ -1,0 +1,69 @@
+{
+  "metadata": {
+    "source_prd": "prd.json",
+    "date": "2026-05-09",
+    "approach": "capability_based",
+    "total_tasks": 19,
+    "agent_types_used": ["build", "test", "review"]
+  },
+  "capability_registry": {
+    "code_generation": {
+      "description": "Writing and modifying files",
+      "tasks_assigned": 19
+    },
+    "infrastructure": {
+      "description": "Dockerfiles, scripts, system configuration",
+      "tasks_assigned": 12
+    },
+    "testing": {
+      "description": "Creating and running BATS tests",
+      "tasks_assigned": 7
+    },
+    "documentation": {
+      "description": "Writing markdown docs",
+      "tasks_assigned": 3
+    },
+    "devops": {
+      "description": "CI/CD, docker compose configuration",
+      "tasks_assigned": 2
+    },
+    "review": {
+      "description": "Post-phase validation review",
+      "tasks_assigned": 0
+    }
+  },
+  "phase_assignments": {
+    "phase_1_foundations": {
+      "parallel_lanes": 8,
+      "tasks": ["DOCKER-001", "DOCKER-002", "LIB-001", "VERIFY-001", "FIXT-001", "SCR-001", "DOCS-001", "BATS-001"],
+      "conflict_check": "none — all zero-dependency, no shared files between DOCKER/LIB/VERIFY/FIXT/SCR/DOCS/BATS",
+      "shared_files_warning": "DOCKER-001 and DOCKER-003 touch same files but are in different phases"
+    },
+    "phase_2_healthcheck_and_registry": {
+      "parallel_lanes": 2,
+      "tasks": ["DOCKER-003", "FIXT-002"],
+      "conflict_check": "none — Dockerfile edits vs fixtures.json, no file conflict"
+    },
+    "phase_3_test_infra_and_compose": {
+      "parallel_lanes": 5,
+      "tasks": ["ORCH-001", "HELP-001", "SCR-002", "DOCS-002", "COMPOSE-001"],
+      "conflict_check": "none — test-framework.sh, helpers.bash, provision.sh, FIXTURES.md, docker-compose.yml: all distinct"
+    },
+    "phase_4_ci_and_smoke": {
+      "parallel_lanes": 3,
+      "tasks": ["SCR-003", "TEST-002", "DOCS-003"],
+      "conflict_check": "none — ci-entrypoint.sh, test_signature.bats, CI.md: all distinct"
+    },
+    "phase_5_final_test": {
+      "parallel_lanes": 1,
+      "tasks": ["TEST-001"],
+      "conflict_check": "none — final sequential task"
+    }
+  },
+  "recommended_execution": {
+    "agent": "any",
+    "explanation": "All tasks are file manipulation in a single repo. Any agent with code_generation capability works. Run phases sequentially, tasks within phases in parallel via subagents.",
+    "max_parallel_subagents": 8,
+    "critical_path": "DOCKER-001 → DOCKER-003 → ORCH-001 → SCR-003 → TEST-001 (shortest: 5 steps)"
+  }
+}

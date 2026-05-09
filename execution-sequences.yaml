@@ -1,0 +1,321 @@
+# Execution Sequences — agent-test-env Gap Closure
+# Generated from prd.json | 2026-05-09 | Mode: ralph_attended | Type: build
+
+metadata:
+  source_prd: prd.json
+  sequence_type: build
+  execution_mode: ralph_attended
+  complexity_score: 52
+  total_tasks: 19
+  total_phases: 5
+  estimated_iterations: 25
+  parallel_opportunities: 4
+
+phases:
+  # ── Phase 1: Independent Foundations (max parallel: 8) ──
+  phase_1_foundations:
+    description: "All tasks with zero dependencies. Run fully parallel."
+    strategy: parallel_independent
+    depends_on: []
+    tasks:
+      - id: DOCKER-001
+        title: "Fix node-based Dockerfiles: add CMD + build-time install"
+        priority: critical
+        agent_type: build
+        required_capabilities: [code_generation, infrastructure]
+        files:
+          - frameworks/opencode/Dockerfile
+          - frameworks/claude-code/Dockerfile
+          - frameworks/gemini-cli/Dockerfile
+          - frameworks/continue/Dockerfile
+        validation:
+          - "grep -c 'CMD.*tail.*dev.null' frameworks/{opencode,claude-code,gemini-cli,continue}/Dockerfile | grep ':1$'"
+          - "grep -c 'RUN.*install.sh' frameworks/{opencode,claude-code,gemini-cli,continue}/Dockerfile | grep ':1$'"
+          - "docker compose build opencode claude-code gemini-cli continue 2>&1"
+
+      - id: DOCKER-002
+        title: "Fix python-based Dockerfile: add CMD + build-time install"
+        priority: critical
+        agent_type: build
+        required_capabilities: [code_generation, infrastructure]
+        files:
+          - frameworks/codex-cli/Dockerfile
+        validation:
+          - "grep 'CMD.*tail.*dev.null' frameworks/codex-cli/Dockerfile"
+          - "grep 'RUN.*install.sh' frameworks/codex-cli/Dockerfile"
+          - "docker compose build codex-cli 2>&1"
+
+      - id: LIB-001
+        title: "Add die() and check_fixture() to all _lib.sh files"
+        priority: high
+        agent_type: build
+        required_capabilities: [code_generation]
+        files:
+          - frameworks/opencode/scripts/_lib.sh
+          - frameworks/claude-code/scripts/_lib.sh
+          - frameworks/codex-cli/scripts/_lib.sh
+          - frameworks/gemini-cli/scripts/_lib.sh
+          - frameworks/continue/scripts/_lib.sh
+          - frameworks/cursor/scripts/_lib.sh
+        validation:
+          - "grep -l 'die()' frameworks/*/scripts/_lib.sh | wc -l | grep '6'"
+          - "grep -l 'check_fixture()' frameworks/*/scripts/_lib.sh | wc -l | grep '6'"
+          - "bash -n frameworks/*/scripts/_lib.sh"
+
+      - id: VERIFY-001
+        title: "Make claude-code, gemini-cli, continue verify.sh fatal"
+        priority: high
+        agent_type: build
+        required_capabilities: [code_generation]
+        files:
+          - frameworks/claude-code/scripts/verify.sh
+          - frameworks/gemini-cli/scripts/verify.sh
+          - frameworks/continue/scripts/verify.sh
+        validation:
+          - "grep 'exit 1' frameworks/{claude-code,gemini-cli,continue}/scripts/verify.sh | wc -l | grep '3'"
+          - "bash -n frameworks/{claude-code,gemini-cli,continue}/scripts/verify.sh"
+
+      - id: FIXT-001
+        title: "Port 10 new fixtures from capacium-test-lab"
+        priority: high
+        agent_type: build
+        required_capabilities: [code_generation, infrastructure]
+        source: "/Users/andrelange/Documents/repositories/github/capacium-test-lab/fixtures/"
+        fixtures:
+          - test-tool        # kind: tool
+          - test-prompt      # kind: prompt
+          - test-template    # kind: template
+          - test-workflow    # kind: workflow
+          - test-connector-pack  # kind: connector-pack
+          - test-bundle      # kind: bundle (sub-skill + sub-tool)
+          - test-dependency  # kind: skill (dependencies)
+          - test-runtimes-skill  # kind: skill (runtime deps)
+          - test-broken-manifest  # invalid manifest
+          - test-signed-cap  # signing/verify tests
+        modifications:
+          - "Change author to 'agent-test-env' in all capability.yaml"
+          - "Remove all Capacium-specific references"
+        validation:
+          - "ls fixtures/test-{tool,prompt,template,workflow,connector-pack,bundle,dependency,runtimes-skill,broken-manifest,signed-cap}/capability.yaml | wc -l | grep '10'"
+          - "grep -h author fixtures/*/capability.yaml | sort -u | grep 'agent-test-env'"
+          - "grep -ri capacium fixtures/*/capability.yaml | wc -l | grep '0'"
+
+      - id: SCR-001
+        title: "Add scripts/test-mcp-live.sh"
+        priority: medium
+        agent_type: build
+        required_capabilities: [code_generation, testing]
+        files:
+          - scripts/test-mcp-live.sh
+        validation:
+          - "test -x scripts/test-mcp-live.sh"
+          - "bash -n scripts/test-mcp-live.sh"
+          - "bash scripts/test-mcp-live.sh"
+
+      - id: DOCS-001
+        title: "Add docs/HOWTO.md"
+        priority: low
+        agent_type: build
+        required_capabilities: [code_generation, documentation]
+        source: "/Users/andrelange/Documents/repositories/github/capacium-test-lab/docs/HOWTO.md"
+        modifications:
+          - "Remove Capacium references"
+          - "Adapt to agent-test-env context"
+        files:
+          - docs/HOWTO.md
+        validation:
+          - "test -f docs/HOWTO.md"
+          - "grep -ci capacium docs/HOWTO.md | grep '0'"
+
+      - id: BATS-001
+        title: "Auto-install BATS in tests/run_tests.sh"
+        priority: low
+        agent_type: build
+        required_capabilities: [code_generation, testing]
+        files:
+          - tests/run_tests.sh
+        validation:
+          - "bash -n tests/run_tests.sh"
+          - "grep -c 'bats-core' tests/run_tests.sh | grep -v ':0$'"
+
+  # ── Phase 2: First-Dependency Layer (max parallel: 2) ──
+  phase_2_healthcheck_and_registry:
+    description: "Tasks that depend only on Phase 1 completions. Run in parallel."
+    strategy: parallel_independent
+    depends_on: [phase_1_foundations]
+    tasks:
+      - id: DOCKER-003
+        title: "Add --start-period=30s to all HEALTHCHECK instructions"
+        priority: critical
+        agent_type: build
+        required_capabilities: [code_generation, infrastructure]
+        depends_on_prd: [DOCKER-001, DOCKER-002]
+        files:
+          - frameworks/opencode/Dockerfile
+          - frameworks/claude-code/Dockerfile
+          - frameworks/codex-cli/Dockerfile
+          - frameworks/gemini-cli/Dockerfile
+          - frameworks/continue/Dockerfile
+        validation:
+          - "grep 'start-period=30s' frameworks/*/Dockerfile | wc -l | grep '5'"
+          - "docker compose build 2>&1"
+          - "docker compose up -d && timeout 120 docker compose wait"
+
+      - id: FIXT-002
+        title: "Create fixtures.json registry"
+        priority: medium
+        agent_type: build
+        required_capabilities: [code_generation, infrastructure]
+        depends_on_prd: [FIXT-001]
+        files:
+          - fixtures.json
+        validation:
+          - "python3 -c \"import json; data=json.load(open('fixtures.json')); assert len(data)==12; print('OK')\""
+          - "python3 -c \"import json; data=json.load(open('fixtures.json')); kinds=set(e['kind'] for e in data); assert len(kinds)>=8; print('OK')\""
+
+  # ── Phase 3: Mid-Layer (max parallel: 5) ──
+  phase_3_test_infra_and_compose:
+    description: "Tasks depending on Phase 2."
+    strategy: parallel_independent
+    depends_on: [phase_2_healthcheck_and_registry]
+    tasks:
+      - id: ORCH-001
+        title: "Replace sleep polling with docker compose wait"
+        priority: high
+        agent_type: build
+        required_capabilities: [code_generation, infrastructure]
+        depends_on_prd: [DOCKER-003]
+        files:
+          - scripts/test-framework.sh
+          - .github/workflows/test.yml
+        validation:
+          - "grep 'docker compose wait' scripts/test-framework.sh .github/workflows/test.yml"
+          - "grep -c 'sleep' scripts/test-framework.sh | grep '0'"
+
+      - id: HELP-001
+        title: "Expand tests/helpers.bash with fixture utilities"
+        priority: medium
+        agent_type: build
+        required_capabilities: [code_generation, testing]
+        depends_on_prd: [FIXT-002]
+        files:
+          - tests/helpers.bash
+        validation:
+          - "bash -n tests/helpers.bash"
+          - "grep -c 'fixture_cleanup\|fixture_install\|fixture_remove' tests/helpers.bash | grep ':3$'"
+          - "grep -c 'ALL_CAP_KINDS' tests/helpers.bash | grep -v ':0$'"
+
+      - id: SCR-002
+        title: "Add scripts/provision.sh"
+        priority: medium
+        agent_type: build
+        required_capabilities: [code_generation, infrastructure]
+        depends_on_prd: [DOCKER-003]
+        files:
+          - scripts/provision.sh
+        validation:
+          - "test -x scripts/provision.sh"
+          - "bash -n scripts/provision.sh"
+
+      - id: DOCS-002
+        title: "Add docs/FIXTURES.md"
+        priority: low
+        agent_type: build
+        required_capabilities: [code_generation, documentation]
+        depends_on_prd: [FIXT-001, FIXT-002]
+        files:
+          - docs/FIXTURES.md
+        validation:
+          - "test -f docs/FIXTURES.md"
+          - "grep -c 'test-skill\|test-tool\|test-bundle' docs/FIXTURES.md | grep -v ':0$'"
+          - "grep -ci capacium docs/FIXTURES.md | grep '0'"
+
+      - id: COMPOSE-001
+        title: "Improve docker-compose.yml with volumes, healthchecks, explicit build"
+        priority: low
+        agent_type: build
+        required_capabilities: [code_generation, devops]
+        depends_on_prd: [DOCKER-003]
+        files:
+          - docker-compose.yml
+        validation:
+          - "docker compose config"
+          - "docker compose config | grep -c 'name.*_skills' | grep '5'"
+          - "docker compose config | grep 'service_healthy'"
+
+  # ── Phase 4: Late Integration (max parallel: 3) ──
+  phase_4_ci_and_smoke:
+    description: "Tasks depending on Phase 3 completions."
+    strategy: parallel_independent
+    depends_on: [phase_3_test_infra_and_compose]
+    tasks:
+      - id: SCR-003
+        title: "Add scripts/ci-entrypoint.sh"
+        priority: medium
+        agent_type: build
+        required_capabilities: [code_generation, testing]
+        depends_on_prd: [ORCH-001, SCR-002]
+        files:
+          - scripts/ci-entrypoint.sh
+        validation:
+          - "test -x scripts/ci-entrypoint.sh"
+          - "bash -n scripts/ci-entrypoint.sh"
+
+      - id: TEST-002
+        title: "Add tests/smoke/test_signature.bats"
+        priority: medium
+        agent_type: build
+        required_capabilities: [code_generation, testing]
+        depends_on_prd: [COMPOSE-001]
+        files:
+          - tests/smoke/test_signature.bats
+        validation:
+          - "bats tests/smoke/test_signature.bats"
+
+      - id: DOCS-003
+        title: "Add docs/CI.md"
+        priority: low
+        agent_type: build
+        required_capabilities: [code_generation, documentation]
+        depends_on_prd: [ORCH-001]
+        files:
+          - docs/CI.md
+        validation:
+          - "test -f docs/CI.md"
+          - "grep -ci capacium docs/CI.md | grep '0'"
+
+  # ── Phase 5: Final Validation ──
+  phase_5_final_test:
+    description: "Last task — depends on all script additions being complete."
+    strategy: sequential
+    depends_on: [phase_4_ci_and_smoke]
+    tasks:
+      - id: TEST-001
+        title: "Add tests/integration/test_verify_all.bats"
+        priority: medium
+        agent_type: build
+        required_capabilities: [code_generation, testing]
+        depends_on_prd: [SCR-001, SCR-002, SCR-003]
+        files:
+          - tests/integration/test_verify_all.bats
+        validation:
+          - "bats tests/integration/test_verify_all.bats"
+          - "bash tests/run_tests.sh all"
+
+# ── Global Validation ──
+global_validation:
+  - docker_compose:
+      command: "docker compose ps"
+      expected: "All 5 services Up (healthy)"
+  - all_bats:
+      command: "bash tests/run_tests.sh all"
+      expected: "All suites pass, exit 0"
+  - no_sleep_polling:
+      command: "grep -r 'sleep' scripts/test-framework.sh .github/workflows/test.yml || true"
+      expected: "No matches"
+  - no_capacium_in_base:
+      command: "grep -ri capacium fixtures/ docs/ scripts/ tests/ --exclude-dir=.git || true"
+      expected: "No matches"
+  - fixtures_json_valid:
+      command: "python3 -c 'import json; d=json.load(open(\"fixtures.json\")); print(len(d),d[0][\"name\"])'"
+      expected: "12 test-skill"

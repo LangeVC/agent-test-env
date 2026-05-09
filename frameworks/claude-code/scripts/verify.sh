@@ -6,5 +6,5 @@ if command -v claude &>/dev/null; then
     log_ok "Claude Code found"
     exit 0
 fi
-log_warn "Claude Code not found (may require authentication)"
-exit 0
+log_error "Claude Code not found (may require authentication)"
+exit 1

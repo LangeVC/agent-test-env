@@ -35,7 +35,7 @@ else
         echo "✗ Failed to start $FRAMEWORK"
         exit 1
     }
-    sleep 5
+    docker compose wait "$FRAMEWORK"
 fi
 
 # Step 2: Run verify.sh (non-fatal for most agents)

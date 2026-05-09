@@ -1,0 +1,660 @@
+{
+  "project": {
+    "name": "agent-test-env Gap Closure",
+    "version": "1.0.0",
+    "description": "Port generic improvements from capacium-test-lab overlay back to agent-test-env base — fix Docker containers, add fixtures, test infrastructure, and documentation",
+    "domain": "devops",
+    "repository": "https://github.com/LangeVC/agent-test-env",
+    "created": "2026-05-09T00:00:00Z",
+    "status": "draft"
+  },
+  "settings": {
+    "max_iterations": 40,
+    "timeout_minutes": 240,
+    "required_capabilities": ["code_generation", "infrastructure", "testing"],
+    "verification_level": "standard"
+  },
+  "objectives": [
+    {
+      "id": "OBJ-01",
+      "description": "Fix all Dockerfiles so containers stay alive and HEALTHCHECK works",
+      "priority": "critical",
+      "success_metrics": [
+        {"metric": "Containers healthy", "target": "5/5 services Up (healthy)", "measurement": "docker compose ps"},
+        {"metric": "docker compose wait", "target": "exit 0 for all services", "measurement": "docker compose wait <service>"}
+      ]
+    },
+    {
+      "id": "OBJ-02",
+      "description": "Add 10 new fixtures covering all capability kinds + edge cases",
+      "priority": "high",
+      "success_metrics": [
+        {"metric": "Fixture count", "target": "12 total fixtures", "measurement": "ls fixtures/*/capability.yaml | wc -l"},
+        {"metric": "Capability kinds covered", "target": "8 kinds", "measurement": "grep -h 'kind:' fixtures/*/capability.yaml | sort -u | wc -l"}
+      ]
+    },
+    {
+      "id": "OBJ-03",
+      "description": "Port test infrastructure: fixtures.json, helpers.bash, test scripts",
+      "priority": "medium",
+      "success_metrics": [
+        {"metric": "BATS tests pass", "target": "all suites green", "measurement": "bash tests/run_tests.sh all"},
+        {"metric": "MCP live test works", "target": "initialize + tools/list succeeds", "measurement": "bash scripts/test-mcp-live.sh"}
+      ]
+    },
+    {
+      "id": "OBJ-04",
+      "description": "Add documentation and Docker compose improvements",
+      "priority": "low",
+      "success_metrics": [
+        {"metric": "Docs present", "target": "3 docs in docs/", "measurement": "ls docs/ | wc -l"},
+        {"metric": "No Capacium branding", "target": "0 occurrences in base", "measurement": "grep -ri capacium fixtures/ docs/ | grep -v .git"}
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "DOCKER-001",
+      "title": "Fix node-based Dockerfiles: add CMD + build-time install",
+      "description": "Add CMD ['tail', '-f', '/dev/null'] and RUN /scripts/install.sh to all 4 node-based Dockerfiles (opencode, claude-code, gemini-cli, continue)",
+      "agent_type": "build",
+      "target_agent": "any",
+      "estimated_tokens": 1200,
+      "estimated_minutes": 10,
+      "priority": "critical",
+      "dependencies": [],
+      "acceptance_criteria": [
+        "All 4 node Dockerfiles have RUN /scripts/install.sh before HEALTHCHECK",
+        "All 4 node Dockerfiles have CMD ['tail', '-f', '/dev/null'] as last line",
+        "docker compose build opencode claude-code gemini-cli continue succeeds",
+        "Containers stay alive after docker compose up -d"
+      ],
+      "verification_steps": [
+        "docker compose build opencode claude-code gemini-cli continue",
+        "docker compose up -d opencode claude-code gemini-cli continue",
+        "docker compose ps (all should be Up)",
+        "docker compose wait opencode claude-code gemini-cli continue"
+      ],
+      "type": "infrastructure",
+      "files": [
+        "frameworks/opencode/Dockerfile",
+        "frameworks/claude-code/Dockerfile",
+        "frameworks/gemini-cli/Dockerfile",
+        "frameworks/continue/Dockerfile"
+      ],
+      "passes": false,
+      "attempts": 0
+    },
+    {
+      "id": "DOCKER-002",
+      "title": "Fix python-based Dockerfile: add CMD + build-time install",
+      "description": "Add CMD ['tail', '-f', '/dev/null'] and RUN /scripts/install.sh to codex-cli Dockerfile",
+      "agent_type": "build",
+      "target_agent": "any",
+      "estimated_tokens": 600,
+      "estimated_minutes": 5,
+      "priority": "critical",
+      "dependencies": [],
+      "acceptance_criteria": [
+        "codex-cli Dockerfile has RUN /scripts/install.sh before HEALTHCHECK",
+        "codex-cli Dockerfile has CMD ['tail', '-f', '/dev/null'] as last line",
+        "docker compose build codex-cli succeeds",
+        "Container stays alive after docker compose up -d"
+      ],
+      "verification_steps": [
+        "docker compose build codex-cli",
+        "docker compose up -d codex-cli",
+        "docker compose ps (codex-cli should be Up)",
+        "docker compose wait codex-cli"
+      ],
+      "type": "infrastructure",
+      "files": ["frameworks/codex-cli/Dockerfile"],
+      "passes": false,
+      "attempts": 0
+    },
+    {
+      "id": "DOCKER-003",
+      "title": "Add --start-period=30s to all HEALTHCHECK instructions",
+      "description": "Add --start-period=30s parameter to HEALTHCHECK in all 5 Dockerfiles to give install scripts time to complete",
+      "agent_type": "build",
+      "target_agent": "any",
+      "estimated_tokens": 800,
+      "estimated_minutes": 5,
+      "priority": "critical",
+      "dependencies": ["DOCKER-001", "DOCKER-002"],
+      "acceptance_criteria": [
+        "All 5 Dockerfiles have HEALTHCHECK --interval=10s --retries=5 --start-period=30s",
+        "docker compose wait reports healthy within 60 seconds for all services"
+      ],
+      "verification_steps": [
+        "grep 'start-period=30s' frameworks/*/Dockerfile | wc -l (should be 5)",
+        "docker compose up -d && timeout 120 docker compose wait"
+      ],
+      "type": "infrastructure",
+      "files": [
+        "frameworks/opencode/Dockerfile",
+        "frameworks/claude-code/Dockerfile",
+        "frameworks/codex-cli/Dockerfile",
+        "frameworks/gemini-cli/Dockerfile",
+        "frameworks/continue/Dockerfile"
+      ],
+      "passes": false,
+      "attempts": 0
+    },
+    {
+      "id": "LIB-001",
+      "title": "Add die() and check_fixture() to all _lib.sh files",
+      "description": "Add die() function (logs error + exits 1) and check_fixture() function (validates fixture directory + capability.yaml) to all 6 framework _lib.sh files",
+      "agent_type": "build",
+      "target_agent": "any",
+      "estimated_tokens": 1500,
+      "estimated_minutes": 10,
+      "priority": "high",
+      "dependencies": [],
+      "acceptance_criteria": [
+        "All 6 _lib.sh files define die() function",
+        "All 6 _lib.sh files define check_fixture() function",
+        "check_fixture exits with error on missing directory",
+        "check_fixture exits with error on missing capability.yaml",
+        "check_fixture succeeds on valid fixture"
+      ],
+      "verification_steps": [
+        "grep -l 'die()' frameworks/*/scripts/_lib.sh | wc -l (should be 6)",
+        "grep -l 'check_fixture()' frameworks/*/scripts/_lib.sh | wc -l (should be 6)",
+        "bash -n frameworks/*/scripts/_lib.sh (all should pass)"
+      ],
+      "type": "infrastructure",
+      "files": [
+        "frameworks/opencode/scripts/_lib.sh",
+        "frameworks/claude-code/scripts/_lib.sh",
+        "frameworks/codex-cli/scripts/_lib.sh",
+        "frameworks/gemini-cli/scripts/_lib.sh",
+        "frameworks/continue/scripts/_lib.sh",
+        "frameworks/cursor/scripts/_lib.sh"
+      ],
+      "passes": false,
+      "attempts": 0
+    },
+    {
+      "id": "VERIFY-001",
+      "title": "Make claude-code, gemini-cli, continue verify.sh fatal",
+      "description": "Change verify.sh in claude-code, gemini-cli, and continue to exit 1 when agent is not installed instead of exit 0",
+      "agent_type": "build",
+      "target_agent": "any",
+      "estimated_tokens": 600,
+      "estimated_minutes": 5,
+      "priority": "high",
+      "dependencies": [],
+      "acceptance_criteria": [
+        "claude-code verify.sh exits 1 when claude binary not found",
+        "gemini-cli verify.sh exits 1 when gemini binary not found",
+        "continue verify.sh exits 1 when continue binary not found",
+        "All 3 scripts still exit 0 when agent IS installed"
+      ],
+      "verification_steps": [
+        "bash -n frameworks/claude-code/scripts/verify.sh",
+        "bash -n frameworks/gemini-cli/scripts/verify.sh",
+        "bash -n frameworks/continue/scripts/verify.sh",
+        "grep 'exit 1' frameworks/claude-code/scripts/verify.sh frameworks/gemini-cli/scripts/verify.sh frameworks/continue/scripts/verify.sh"
+      ],
+      "type": "infrastructure",
+      "files": [
+        "frameworks/claude-code/scripts/verify.sh",
+        "frameworks/gemini-cli/scripts/verify.sh",
+        "frameworks/continue/scripts/verify.sh"
+      ],
+      "passes": false,
+      "attempts": 0
+    },
+    {
+      "id": "ORCH-001",
+      "title": "Replace sleep polling with docker compose wait",
+      "description": "Replace sleep 5 kludge in test-framework.sh with docker compose wait, and replace sleep+grep polling in CI workflow with docker compose wait",
+      "agent_type": "build",
+      "target_agent": "any",
+      "estimated_tokens": 800,
+      "estimated_minutes": 5,
+      "priority": "high",
+      "dependencies": ["DOCKER-003"],
+      "acceptance_criteria": [
+        "scripts/test-framework.sh uses docker compose wait instead of sleep 5",
+        ".github/workflows/test.yml uses docker compose wait instead of sleep + grep polling",
+        "No sleep commands remain in test orchestration or CI workflow"
+      ],
+      "verification_steps": [
+        "grep 'docker compose wait' scripts/test-framework.sh",
+        "grep 'docker compose wait' .github/workflows/test.yml",
+        "grep -c 'sleep' scripts/test-framework.sh (should be 0)",
+        "bash -n scripts/test-framework.sh"
+      ],
+      "type": "infrastructure",
+      "files": [
+        "scripts/test-framework.sh",
+        ".github/workflows/test.yml"
+      ],
+      "passes": false,
+      "attempts": 0
+    },
+    {
+      "id": "FIXT-001",
+      "title": "Port 10 new fixtures from capacium-test-lab",
+      "description": "Copy all 10 new fixture directories from capacium-test-lab, changing author field to 'agent-test-env' and removing Capacium-specific references",
+      "agent_type": "build",
+      "target_agent": "any",
+      "estimated_tokens": 4000,
+      "estimated_minutes": 20,
+      "priority": "high",
+      "dependencies": [],
+      "acceptance_criteria": [
+        "test-tool fixture exists with capability.yaml (kind: tool) and tool.sh",
+        "test-prompt fixture exists with capability.yaml (kind: prompt) and prompt.md",
+        "test-template fixture exists with capability.yaml (kind: template) and template.md",
+        "test-workflow fixture exists with capability.yaml (kind: workflow) and workflow.md",
+        "test-connector-pack fixture exists with capability.yaml (kind: connector-pack) and connectors.json",
+        "test-bundle fixture exists with bundle structure + sub-skill + sub-tool",
+        "test-dependency fixture exists with capability.yaml declaring dependencies",
+        "test-runtimes-skill fixture exists with runtime requirements",
+        "test-broken-manifest fixture exists with intentionally invalid capability.yaml",
+        "test-signed-cap fixture exists for signing/verification tests",
+        "All capability.yaml files have author: agent-test-env",
+        "No Capacium references in any new fixture file"
+      ],
+      "verification_steps": [
+        "ls fixtures/test-tool fixtures/test-prompt fixtures/test-template fixtures/test-workflow",
+        "ls fixtures/test-connector-pack fixtures/test-bundle fixtures/test-dependency",
+        "ls fixtures/test-runtimes-skill fixtures/test-broken-manifest fixtures/test-signed-cap",
+        "for d in fixtures/*/; do python3 -c \"import yaml; print(yaml.safe_load(open('${d}capability.yaml'))['author'])\"; done | grep -v 'agent-test-env'",
+        "grep -ri capacium fixtures/*/capability.yaml (should return empty)"
+      ],
+      "type": "infrastructure",
+      "files": [],
+      "passes": false,
+      "attempts": 0
+    },
+    {
+      "id": "FIXT-002",
+      "title": "Create fixtures.json registry",
+      "description": "Create fixtures.json at repository root with JSON array of all 12 fixtures (name, kind, version). Pattern: auto-discovery of test fixtures without scanning the filesystem in tests",
+      "agent_type": "build",
+      "target_agent": "any",
+      "estimated_tokens": 1000,
+      "estimated_minutes": 10,
+      "priority": "medium",
+      "dependencies": ["FIXT-001"],
+      "acceptance_criteria": [
+        "fixtures.json exists at repository root",
+        "Contains JSON array with 12 entries",
+        "Each entry has name, kind, version fields",
+        "JSON is valid (python3 -c 'import json; json.load(open(\"fixtures.json\"))')",
+        "Names match fixture directory names exactly"
+      ],
+      "verification_steps": [
+        "python3 -c \"import json; data=json.load(open('fixtures.json')); assert len(data)==12; print('OK')\"",
+        "python3 -c \"import json; data=json.load(open('fixtures.json')); kinds=set(e['kind'] for e in data); print(f'{len(kinds)} kinds: {sorted(kinds)}')\""
+      ],
+      "type": "infrastructure",
+      "files": ["fixtures.json"],
+      "passes": false,
+      "attempts": 0
+    },
+    {
+      "id": "HELP-001",
+      "title": "Expand tests/helpers.bash with fixture utilities",
+      "description": "Replace 3-line stub with full test helper infrastructure: exports TEST_LAB_ROOT, FIXTURES_DIR, auto-discovers ALL_CAP_KINDS from fixtures.json, provides fixture_cleanup(), fixture_install(), fixture_remove() functions",
+      "agent_type": "build",
+      "target_agent": "any",
+      "estimated_tokens": 2000,
+      "estimated_minutes": 15,
+      "priority": "medium",
+      "dependencies": ["FIXT-002"],
+      "acceptance_criteria": [
+        "tests/helpers.bash exports TEST_LAB_ROOT and FIXTURES_DIR",
+        "ALL_CAP_KINDS is populated from fixtures.json",
+        "fixture_cleanup() removes skills directories from container",
+        "fixture_install() creates symlinks for a fixture",
+        "fixture_remove() cleans up specific fixture",
+        "All functions use generic fixture_* naming (no cap_* prefix)",
+        "bash -n tests/helpers.bash passes"
+      ],
+      "verification_steps": [
+        "bash -n tests/helpers.bash",
+        "source tests/helpers.bash && echo \"ALL_CAP_KINDS=$ALL_CAP_KINDS\"",
+        "bats tests/unit/ (helpers should be sourceable by BATS)"
+      ],
+      "type": "testing",
+      "files": ["tests/helpers.bash"],
+      "passes": false,
+      "attempts": 0
+    },
+    {
+      "id": "SCR-001",
+      "title": "Add scripts/test-mcp-live.sh",
+      "description": "Port MCP JSON-RPC handshake test from capacium-test-lab. Performs initialize request and tools/list request via stdin/stdout on the test-mcp-server fixture",
+      "agent_type": "build",
+      "target_agent": "any",
+      "estimated_tokens": 1500,
+      "estimated_minutes": 10,
+      "priority": "medium",
+      "dependencies": [],
+      "acceptance_criteria": [
+        "scripts/test-mcp-live.sh exists and is executable",
+        "Script performs JSON-RPC initialize request on fixtures/test-mcp-server/server.js",
+        "Script performs tools/list request and validates response",
+        "Script exits 0 on success, non-zero on failure",
+        "No Capacium references in script"
+      ],
+      "verification_steps": [
+        "test -x scripts/test-mcp-live.sh",
+        "bash -n scripts/test-mcp-live.sh",
+        "bash scripts/test-mcp-live.sh"
+      ],
+      "type": "testing",
+      "files": ["scripts/test-mcp-live.sh"],
+      "passes": false,
+      "attempts": 0
+    },
+    {
+      "id": "SCR-002",
+      "title": "Add scripts/provision.sh",
+      "description": "Port framework provisioning script. Starts Docker containers and creates skill directories for all frameworks",
+      "agent_type": "build",
+      "target_agent": "any",
+      "estimated_tokens": 1000,
+      "estimated_minutes": 8,
+      "priority": "medium",
+      "dependencies": ["DOCKER-003"],
+      "acceptance_criteria": [
+        "scripts/provision.sh exists and is executable",
+        "Script starts all framework containers via docker compose up -d",
+        "Script creates skill directories in containers",
+        "Script exits 0 on success",
+        "No Capacium references in script"
+      ],
+      "verification_steps": [
+        "test -x scripts/provision.sh",
+        "bash -n scripts/provision.sh",
+        "bash scripts/provision.sh && docker compose ps"
+      ],
+      "type": "infrastructure",
+      "files": ["scripts/provision.sh"],
+      "passes": false,
+      "attempts": 0
+    },
+    {
+      "id": "SCR-003",
+      "title": "Add scripts/ci-entrypoint.sh",
+      "description": "Port CI entrypoint orchestrator. Runs test-framework.sh for each framework+fixture combination",
+      "agent_type": "build",
+      "target_agent": "any",
+      "estimated_tokens": 1000,
+      "estimated_minutes": 8,
+      "priority": "medium",
+      "dependencies": ["ORCH-001", "SCR-002"],
+      "acceptance_criteria": [
+        "scripts/ci-entrypoint.sh exists and is executable",
+        "Script iterates over frameworks from fixtures.json",
+        "Script runs test-framework.sh for each framework",
+        "Script returns aggregate exit code (0 only if all pass)",
+        "No Capacium references in script"
+      ],
+      "verification_steps": [
+        "test -x scripts/ci-entrypoint.sh",
+        "bash -n scripts/ci-entrypoint.sh"
+      ],
+      "type": "testing",
+      "files": ["scripts/ci-entrypoint.sh"],
+      "passes": false,
+      "attempts": 0
+    },
+    {
+      "id": "TEST-001",
+      "title": "Add tests/integration/test_verify_all.bats",
+      "description": "Add BATS test file that validates script existence and executability for test-framework.sh, provision.sh, ci-entrypoint.sh",
+      "agent_type": "build",
+      "target_agent": "any",
+      "estimated_tokens": 800,
+      "estimated_minutes": 8,
+      "priority": "medium",
+      "dependencies": ["SCR-001", "SCR-002", "SCR-003"],
+      "acceptance_criteria": [
+        "tests/integration/test_verify_all.bats exists",
+        "At least 3 test cases: validates test-framework.sh, provision.sh, ci-entrypoint.sh",
+        "Checks existence and executability of each script",
+        "bats tests/integration/test_verify_all.bats passes"
+      ],
+      "verification_steps": [
+        "bats tests/integration/test_verify_all.bats"
+      ],
+      "type": "testing",
+      "files": ["tests/integration/test_verify_all.bats"],
+      "passes": false,
+      "attempts": 0
+    },
+    {
+      "id": "TEST-002",
+      "title": "Add tests/smoke/test_signature.bats",
+      "description": "Add BATS test file that validates docker-compose.yml structure: named volumes, healthcheck presence, depends_on with condition",
+      "agent_type": "build",
+      "target_agent": "any",
+      "estimated_tokens": 800,
+      "estimated_minutes": 8,
+      "priority": "medium",
+      "dependencies": ["COMPOSE-001"],
+      "acceptance_criteria": [
+        "tests/smoke/test_signature.bats exists",
+        "At least 2 test cases: checks named volumes, checks healthcheck/depends_on",
+        "bats tests/smoke/test_signature.bats passes"
+      ],
+      "verification_steps": [
+        "bats tests/smoke/test_signature.bats"
+      ],
+      "type": "testing",
+      "files": ["tests/smoke/test_signature.bats"],
+      "passes": false,
+      "attempts": 0
+    },
+    {
+      "id": "DOCS-001",
+      "title": "Add docs/HOWTO.md",
+      "description": "Create test-writing guide covering BATS patterns, JSON validation, graceful skips, and debugging tips. Adapted from capacium-test-lab with Capacium references removed",
+      "agent_type": "build",
+      "target_agent": "any",
+      "estimated_tokens": 2000,
+      "estimated_minutes": 10,
+      "priority": "low",
+      "dependencies": [],
+      "acceptance_criteria": [
+        "docs/HOWTO.md exists",
+        "Covers BATS test patterns with examples",
+        "Covers JSON validation (capability.yaml, fixtures.json)",
+        "Covers graceful skip patterns",
+        "No Capacium references"
+      ],
+      "verification_steps": [
+        "test -f docs/HOWTO.md",
+        "grep -c 'BATS' docs/HOWTO.md (should be > 0)",
+        "grep -ci capacium docs/HOWTO.md (should be 0)"
+      ],
+      "type": "documentation",
+      "files": ["docs/HOWTO.md"],
+      "passes": false,
+      "attempts": 0
+    },
+    {
+      "id": "DOCS-002",
+      "title": "Add docs/FIXTURES.md",
+      "description": "Create fixture guide listing all 12 fixtures, their kinds, how to add new fixtures, and naming conventions",
+      "agent_type": "build",
+      "target_agent": "any",
+      "estimated_tokens": 1500,
+      "estimated_minutes": 8,
+      "priority": "low",
+      "dependencies": ["FIXT-001", "FIXT-002"],
+      "acceptance_criteria": [
+        "docs/FIXTURES.md exists",
+        "Lists all 12 fixtures with kind, version, purpose",
+        "Explains how to add a new fixture",
+        "Covers capability.yaml required fields",
+        "No Capacium references"
+      ],
+      "verification_steps": [
+        "test -f docs/FIXTURES.md",
+        "grep -c 'test-skill' docs/FIXTURES.md (should be > 0)",
+        "grep -ci capacium docs/FIXTURES.md (should be 0)"
+      ],
+      "type": "documentation",
+      "files": ["docs/FIXTURES.md"],
+      "passes": false,
+      "attempts": 0
+    },
+    {
+      "id": "DOCS-003",
+      "title": "Add docs/CI.md",
+      "description": "Create CI reference guide describing GitHub Actions workflow, local run instructions, and CI limitations",
+      "agent_type": "build",
+      "target_agent": "any",
+      "estimated_tokens": 1500,
+      "estimated_minutes": 8,
+      "priority": "low",
+      "dependencies": ["ORCH-001"],
+      "acceptance_criteria": [
+        "docs/CI.md exists",
+        "Describes CI matrix (agent x fixture)",
+        "Includes local testing instructions",
+        "Covers CI runner requirements",
+        "No Capacium references"
+      ],
+      "verification_steps": [
+        "test -f docs/CI.md",
+        "grep -c 'docker compose' docs/CI.md (should be > 0)",
+        "grep -ci capacium docs/CI.md (should be 0)"
+      ],
+      "type": "documentation",
+      "files": ["docs/CI.md"],
+      "passes": false,
+      "attempts": 0
+    },
+    {
+      "id": "COMPOSE-001",
+      "title": "Improve docker-compose.yml with volumes, healthchecks, explicit build",
+      "description": "Add named volumes for skill persistence, healthcheck on opencode with depends_on, explicit build blocks, bump version to 3.9",
+      "agent_type": "build",
+      "target_agent": "any",
+      "estimated_tokens": 1500,
+      "estimated_minutes": 10,
+      "priority": "low",
+      "dependencies": ["DOCKER-003"],
+      "acceptance_criteria": [
+        "5 named volumes for opencode/claude/codex/gemini/continue skill directories",
+        "Healthcheck on opencode service",
+        "test-runner (or equivalent) depends_on opencode with condition: service_healthy",
+        "All build blocks use explicit context + dockerfile syntax",
+        "Compose version is 3.9",
+        "docker compose config parses without errors"
+      ],
+      "verification_steps": [
+        "docker compose config",
+        "docker compose config | grep -c 'name.*_skills' (should be 5)",
+        "docker compose config | grep -c 'service_healthy' (should be >= 1)"
+      ],
+      "type": "devops",
+      "files": ["docker-compose.yml"],
+      "passes": false,
+      "attempts": 0
+    },
+    {
+      "id": "BATS-001",
+      "title": "Auto-install BATS in tests/run_tests.sh",
+      "description": "Add auto-install logic to run_tests.sh: if bats binary not found on PATH, clone and install bats-core to /tmp before running test suites",
+      "agent_type": "build",
+      "target_agent": "any",
+      "estimated_tokens": 1000,
+      "estimated_minutes": 8,
+      "priority": "low",
+      "dependencies": [],
+      "acceptance_criteria": [
+        "tests/run_tests.sh detects missing bats on PATH",
+        "Auto-installs bats-core to /tmp if missing",
+        "Does not re-install if bats already available",
+        "Adds 'cli' suite to run_tests.sh (in addition to unit, integration, smoke)",
+        "bash tests/run_tests.sh all works on system without bats"
+      ],
+      "verification_steps": [
+        "bash -n tests/run_tests.sh",
+        "docker run --rm -v $(pwd):/test -w /test alpine:latest ash -c 'apk add bash git && bash tests/run_tests.sh all'"
+      ],
+      "type": "testing",
+      "files": ["tests/run_tests.sh"],
+      "passes": false,
+      "attempts": 0
+    }
+  ],
+  "execution_recommendation": {
+    "mode": "standard",
+    "reason": "19 tasks across 4 phases, 3 hours total, moderate dependencies with critical Docker fixes blocking everything",
+    "suggested_workflow": "ralph-loop-attended",
+    "estimated_iterations": 25,
+    "parallel_opportunities": 4,
+    "recommended_capabilities": ["code_generation", "infrastructure", "testing", "review"],
+    "complexity_score": 52
+  },
+  "assumptions": [
+    {
+      "description": "tail -f /dev/null is available in node:22-alpine and python:3.12-slim",
+      "impact_if_wrong": "Need alternative keep-alive command (sleep infinity)",
+      "validation_method": "Test in both base images"
+    },
+    {
+      "description": "capacium-test-lab fixture files are directly copyable with only author field changes",
+      "impact_if_wrong": "May need to adapt fixture structure for agent-test-env conventions",
+      "validation_method": "Compare capability.yaml schemas between repos"
+    },
+    {
+      "description": "docker compose wait is available in CI runner Docker version",
+      "impact_if_wrong": "Fallback to health polling loop with grep",
+      "validation_method": "Check docker compose version in CI runner"
+    }
+  ],
+  "constraints": {
+    "technical": [
+      "Must preserve backward compatibility with capacium-test-lab overlay pattern",
+      "Must not introduce Capacium-specific naming (cap_* prefixes, author branding)",
+      "All new fixtures use author: agent-test-env in capability.yaml",
+      "test.sh files in frameworks must still accept $1 fixture parameter"
+    ]
+  },
+  "dependencies": {
+    "external": [
+      {
+        "name": "capacium-test-lab repository",
+        "owner": "Same GitHub org",
+        "timeline": "Already available",
+        "risk_level": "low"
+      }
+    ],
+    "internal": []
+  },
+  "risks": [
+    {
+      "description": "Build-time install fails in CI due to network issues",
+      "probability": "medium",
+      "impact": "high",
+      "mitigation": "Retry logic in install.sh, pre-built images as fallback",
+      "owner": "dev"
+    },
+    {
+      "description": "docker compose wait not available in CI runner",
+      "probability": "low",
+      "impact": "medium",
+      "mitigation": "Feature-detect and fallback to polling loop",
+      "owner": "dev"
+    },
+    {
+      "description": "Fixture YAML incompatible with existing test expectations",
+      "probability": "low",
+      "impact": "medium",
+      "mitigation": "Keep structure identical to capacium-test-lab, only change author",
+      "owner": "dev"
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+digraph "agent-test-env-gap-closure" {
+  rankdir=TB;
+  node [shape=box, style=rounded];
+  fontname="Helvetica";
+
+  subgraph cluster_phase1 {
+    label="Phase 1: Foundations (8 parallel)";
+    style=filled;
+    color=lightgrey;
+    node [style=filled, color=white];
+
+    DOCKER001 [label="DOCKER-001\nNode Dockerfiles", fillcolor=lightcoral];
+    DOCKER002 [label="DOCKER-002\nPython Dockerfile", fillcolor=lightcoral];
+    LIB001 [label="LIB-001\n_lib.sh die/check", fillcolor=lightyellow];
+    VERIFY001 [label="VERIFY-001\nFatal verify.sh", fillcolor=lightyellow];
+    FIXT001 [label="FIXT-001\n10 fixtures", fillcolor=lightyellow];
+    SCR001 [label="SCR-001\nMCP live test", fillcolor=lightcyan];
+    DOCS001 [label="DOCS-001\nHOWTO.md", fillcolor=lightgreen];
+    BATS001 [label="BATS-001\nAuto-install BATS", fillcolor=lightgreen];
+  }
+
+  subgraph cluster_phase2 {
+    label="Phase 2: Healthcheck + Registry (2 parallel)";
+    style=filled;
+    color=lightgrey;
+    node [style=filled, color=white];
+
+    DOCKER003 [label="DOCKER-003\nstart-period=30s", fillcolor=lightcoral];
+    FIXT002 [label="FIXT-002\nfixtures.json", fillcolor=lightcyan];
+  }
+
+  subgraph cluster_phase3 {
+    label="Phase 3: Scripts + Compose (5 parallel)";
+    style=filled;
+    color=lightgrey;
+    node [style=filled, color=white];
+
+    ORCH001 [label="ORCH-001\ncompose wait", fillcolor=lightyellow];
+    HELP001 [label="HELP-001\nhelpers.bash", fillcolor=lightcyan];
+    SCR002 [label="SCR-002\nprovision.sh", fillcolor=lightcyan];
+    DOCS002 [label="DOCS-002\nFIXTURES.md", fillcolor=lightgreen];
+    COMPOSE001 [label="COMPOSE-001\ndocker-compose.yml", fillcolor=lightgreen];
+  }
+
+  subgraph cluster_phase4 {
+    label="Phase 4: CI + Smoke (3 parallel)";
+    style=filled;
+    color=lightgrey;
+    node [style=filled, color=white];
+
+    SCR003 [label="SCR-003\nci-entrypoint.sh", fillcolor=lightcyan];
+    TEST002 [label="TEST-002\nsignature.bats", fillcolor=lightcyan];
+    DOCS003 [label="DOCS-003\nCI.md", fillcolor=lightgreen];
+  }
+
+  subgraph cluster_phase5 {
+    label="Phase 5: Final Validation";
+    style=filled;
+    color=lightgrey;
+    node [style=filled, color=white];
+
+    TEST001 [label="TEST-001\nverify_all.bats", fillcolor=lightcyan];
+  }
+
+  // Phase 1 → Phase 2
+  DOCKER001 -> DOCKER003;
+  DOCKER002 -> DOCKER003;
+  FIXT001 -> FIXT002;
+
+  // Phase 2 → Phase 3
+  DOCKER003 -> ORCH001;
+  FIXT002 -> HELP001;
+  DOCKER003 -> SCR002;
+  FIXT001 -> DOCS002;
+  FIXT002 -> DOCS002;
+  DOCKER003 -> COMPOSE001;
+
+  // Phase 3 → Phase 4
+  ORCH001 -> SCR003;
+  SCR002 -> SCR003;
+  COMPOSE001 -> TEST002;
+  ORCH001 -> DOCS003;
+
+  // Phase 4 → Phase 5
+  SCR001 -> TEST001;
+  SCR002 -> TEST001;
+  SCR003 -> TEST001;
+
+  // Legend
+  subgraph cluster_legend {
+    label="Legend";
+    style=filled;
+    color=white;
+
+    CRIT [label="Critical", fillcolor=lightcoral, style=filled];
+    HIGH [label="High", fillcolor=lightyellow, style=filled];
+    MED [label="Medium", fillcolor=lightcyan, style=filled];
+    LOW [label="Low", fillcolor=lightgreen, style=filled];
+  }
+}

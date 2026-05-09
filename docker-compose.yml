@@ -1,4 +1,4 @@
-version: "3.8"
+version: "3.9"
 
 services:
   opencode:
@@ -9,10 +9,16 @@ services:
     hostname: opencode
     volumes:
       - ./fixtures:/fixtures:ro
+      - opencode_skills:/root/.opencode/skills
     networks:
       - agent-test-network
     tty: true
     stdin_open: true
+    healthcheck:
+      test: ["CMD", "/scripts/verify.sh"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
 
   claude-code:
     build:
@@ -22,6 +28,7 @@ services:
     hostname: claude-code
     volumes:
       - ./fixtures:/fixtures:ro
+      - claude_skills:/root/.claude/skills
     networks:
       - agent-test-network
     tty: true
@@ -35,6 +42,7 @@ services:
     hostname: codex-cli
     volumes:
       - ./fixtures:/fixtures:ro
+      - codex_skills:/root/.codex/skills
     networks:
       - agent-test-network
     tty: true
@@ -48,6 +56,7 @@ services:
     hostname: gemini-cli
     volumes:
       - ./fixtures:/fixtures:ro
+      - gemini_skills:/root/.gemini/skills
     networks:
       - agent-test-network
     tty: true
@@ -61,6 +70,7 @@ services:
     hostname: continue
     volumes:
       - ./fixtures:/fixtures:ro
+      - continue_skills:/root/.continue/skills
     networks:
       - agent-test-network
     tty: true
@@ -70,3 +80,10 @@ networks:
   agent-test-network:
     name: agent-test-network
     driver: bridge
+
+volumes:
+  opencode_skills:
+  claude_skills:
+  codex_skills:
+  gemini_skills:
+  continue_skills:

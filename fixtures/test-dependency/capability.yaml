@@ -1,0 +1,10 @@
+name: test-dependency
+version: 1.0.0
+kind: skill
+description: Test skill with dependencies for agent-test-env — validates lock file generation
+author: agent-test-env
+dependencies:
+  - name: test-skill
+    version: ">=1.0.0"
+  - name: test-tool
+    version: ">=1.0.0"
